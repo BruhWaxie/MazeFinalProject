@@ -55,6 +55,7 @@ class GameSprite(sprite.Sprite):
         self.rect = self.image.get_rect()
         self.rect.x = x
         self.rect.y = y
+        self.mask = mask.from_surface(self.image)
         sprites.add(self)
     def draw(self, window):
         window.blit(self.image, self.rect)
@@ -67,6 +68,7 @@ class SightField(sprite.Sprite):
         self.rect = self.image.get_rect()
         self.rect.x = x
         self.rect.y = y
+        
         sprites.add(self)
     def draw(self, window):
         window.blit(self.image, self.rect)
@@ -83,7 +85,8 @@ class Player(GameSprite):
             "down": [image.load('a1.png'), image.load('a2.png')],
             "right": [image.load('a4.png'), image.load('a5.png')],
             "left": [image.load('a6.png'), image.load('a7.png')],
-            "up": [image.load('a8.png'), image.load('a3.png')]  # Assuming a3 is also the up sprite
+            "up": [image.load('a8.png'), image.load('a3.png')],
+            'idle': [image.load('idle1.png'), image.load('idle2.png')]  # Assuming a3 is also the up sprite
         }
         
         self.direction = "down"
@@ -97,7 +100,8 @@ class Player(GameSprite):
         if now - self.last_update > self.frame_rate:
             self.last_update = now
             self.frame = (self.frame + 1) % 2  # Cycle through the frames
-
+            self.image = self.images[self.direction][self.frame]
+            self.mask = mask.from_surface(self.image)
         self.old_pos = self.rect.x, self.rect.y
         keys = key.get_pressed()
         if keys[K_w] and self.rect.y > 0:
@@ -116,20 +120,20 @@ class Player(GameSprite):
             self.rect.x += self.speed
             sight_field.rect.x += self.speed
             self.direction = "right"
-
-        collidelist = sprite.spritecollide(self, walls, False)
+        collidelist = sprite.spritecollide(self, walls, False, sprite.collide_mask)
         if len(collidelist) > 0:
             self.rect.x, self.rect.y = self.old_pos
             sight_field.rect.centerx, sight_field.rect.centery = self.old_pos
-        collidelist = sprite.spritecollide(self, others, False)
+        collidelist = sprite.spritecollide(self, others, False, sprite.collide_mask)
         if len(collidelist) > 0:
             self.rect.x, self.rect.y = self.old_pos
             sight_field.rect.centerx, sight_field.rect.centery = self.old_pos
         
 
     def draw(self, window):
-        window.blit(self.images[self.direction][self.frame], self.rect)
-
+        
+        window.blit(self.image , self.rect)
+        
 
 
 walls = sprite.Group()
@@ -182,88 +186,100 @@ player = Player(image.load('idle1.png'), TILESIZE, TILESIZE)
 
 finish_text = font2.render('Game Over!', True, (255, 0, 15))
 treasure = None
-with open('map3.txt', 'r') as file:
-    x, y = 0, 0
-    map = file.readlines()
+collision_block = None
+hole1 = None
+def start_level(level):
+    global collision_block, hole1, treasure
 
-    for row in map:
-        for symbol in map:
-            if symbol == ' ' or symbol == '' or symbol == 'f':
-                GameSprite(floor_img,TILESIZE,TILESIZE,x,y)
-            x+=TILESIZE
-        y+= TILESIZE
-    x, y = 0,0
-    for row in map:
-        
-        for symbol in row:
+    with open(level, 'r') as file:
+        x, y = 0, 0
+        map = file.readlines()
 
-            if symbol == '1':
-                Wall1(x, y)
-            if symbol == '2':
-                Wall2(x,y)
-            if symbol == '3':
-                Wall3(x,y)
-            elif symbol == '(':
-                GameSprite(image.load('floor3.png'), TILESIZE, TILESIZE,x,y)
-            elif symbol == 'H':
-                GameSprite(image.load('floor_hole3.png'), TILESIZE, TILESIZE,x,y)
-            elif symbol == 'P':
-                player.rect.x = x
-                player.rect.y = y
-                player.start_x, player.start_y = player.rect.x, player.rect.y
-                sight_field.rect.centerx = x
-                sight_field.rect.centery = y
-            elif symbol == 't':
-                treasure = Other(treasure_img, TILESIZE, TILESIZE+45, x, y)
-            elif symbol == '4':
-                Wall4(x,y)
-            elif symbol == '5':
-                Wall5(x,y)
-            elif symbol == '6':
-                Wall6(x,y)
-            elif symbol == '7':
-                Wall7(x,y)
-            elif symbol == '!':
-                GameSprite(bb_img, TILESIZE,TILESIZE,x,y)
-                GameSprite(corner1_img, TILESIZE-15, TILESIZE-15, x,y)
-                
-            elif symbol == "@":
-                GameSprite(bb_img, TILESIZE,TILESIZE,x,y)
+        # for row in map:
+        #     for symbol in map:
+        #         if symbol == ' ' or symbol == '' or symbol == 'f':
+        #             GameSprite(floor_img,TILESIZE,TILESIZE,x,y)
+        #         x+=TILESIZE
+        #     y+= TILESIZE
+        # x, y = 0,0
+        for row in map:
+            
+            for symbol in row:
 
-                GameSprite(corner2_img, TILESIZE-15, TILESIZE-15, x+15,y)
-            elif symbol == '#':
-                GameSprite(bb_img, TILESIZE,TILESIZE,x,y)
-                GameSprite(corner3_img, TILESIZE-15, TILESIZE-15,x,y)
-            elif symbol == '$':
-                GameSprite(bb_img, TILESIZE,TILESIZE,x,y)
-                GameSprite(corner4_img, TILESIZE-15, TILESIZE-15,x+15,y+15)
+                if symbol == '1':
+                    Wall1(x, y)
+                if symbol == '2':
+                    Wall2(x,y)
+                if symbol == '3':
+                    Wall3(x,y)
+                elif symbol == '(':
+                    GameSprite(image.load('floor3.png'), TILESIZE, TILESIZE,x,y)
+                elif symbol == 'H':
+                    GameSprite(image.load('floor_hole3.png'), TILESIZE, TILESIZE,x,y)
+                elif symbol == 'P':
+                    player.rect.x = x
+                    player.rect.y = y
+                    player.start_x, player.start_y = player.rect.x, player.rect.y
+                    sight_field.rect.centerx = x
+                    sight_field.rect.centery = y
+                elif symbol == 't':
+                    
+                    treasure = Other(treasure_img, TILESIZE, TILESIZE+45, x, y)
+                elif symbol == '4':
+                    Wall4(x,y)
+                elif symbol == '5':
+                    Wall5(x,y)
+                elif symbol == '6':
+                    Wall6(x,y)
+                elif symbol == '7':
+                    Wall7(x,y)
+                elif symbol == '!':
+                    GameSprite(bb_img, TILESIZE,TILESIZE,x,y)
+                    GameSprite(corner1_img, TILESIZE-15, TILESIZE-15, x,y)
+                    
+                elif symbol == "@":
+                    GameSprite(bb_img, TILESIZE,TILESIZE,x,y)
 
-            elif symbol == '8':
-                Wall8(x,y)
-            elif symbol == 'b':
-                GameSprite(bb_img, TILESIZE, TILESIZE,x,y)
-            elif symbol == 'B':
-                bed = Other(bed_img,TILESIZE+45, TILESIZE+120, x+5,y)
-            elif symbol == 's':
-                shelf = Other(shelf_img, TILESIZE,TILESIZE+25,x,y)
-            elif symbol == 'l':
-                lfurn = Other(lfurniture, TILESIZE+155, TILESIZE+35,x,y)
-            elif symbol == 'k':
-                kfurn = Other(kfurn_img, TILESIZE+100, TILESIZE+35,x, -5)
-            elif symbol == 'h':
-                hole1 = GameSprite(image.load('floor_hole1.png'), TILESIZE, TILESIZE, x,y)
-            elif symbol == 'a':
-                Other(image.load('abandoned_shelf.png'), TILESIZE, TILESIZE+50, x,y)
-            elif symbol == ')':
-                Other(image.load('barrels.png'), TILESIZE+70, TILESIZE+45, x,y)
-            elif symbol == 'A':
-                Other(image.load('abandoned_table.png'), TILESIZE+25, TILESIZE+35, x,y)
+                    GameSprite(corner2_img, TILESIZE-15, TILESIZE-15, x+15,y)
+                elif symbol == '#':
+                    GameSprite(bb_img, TILESIZE,TILESIZE,x,y)
+                    GameSprite(corner3_img, TILESIZE-15, TILESIZE-15,x,y)
+                elif symbol == '$':
+                    GameSprite(bb_img, TILESIZE,TILESIZE,x,y)
+                    GameSprite(corner4_img, TILESIZE-15, TILESIZE-15,x+15,y+15)
+
+                elif symbol == '8':
+                    Wall8(x,y)
+                elif symbol == 'b':
+                    GameSprite(bb_img, TILESIZE, TILESIZE,x,y)
+                elif symbol == 'B':
+                    bed = Other(bed_img,TILESIZE+45, TILESIZE+120, x+5,y)
+                elif symbol == 's':
+                    shelf = Other(shelf_img, TILESIZE,TILESIZE+25,x,y)
+                elif symbol == 'l':
+                    lfurn = Other(lfurniture, TILESIZE+155, TILESIZE+35,x,y)
+                elif symbol == 'k':
+                    kfurn = Other(kfurn_img, TILESIZE+100, TILESIZE+35,x, -5)
+                elif symbol == 'h':
+                    
+                    hole1 = GameSprite(image.load('floor_hole1.png'), TILESIZE, TILESIZE, x,y)
+                elif symbol == 'a':
+                    Other(image.load('abandoned_shelf.png'), TILESIZE, TILESIZE+50, x,y)
+                elif symbol == ')':
+                    Other(image.load('barrels.png'), TILESIZE+70, TILESIZE+45, x,y)
+                elif symbol == 'A':
+                    Other(image.load('abandoned_table.png'), TILESIZE+25, TILESIZE+35, x,y)
+                elif symbol == 'C':
+                   
+                    collision_block=GameSprite(image.load('collision_block.png'), TILESIZE, TILESIZE, x,y)
 
             
-            x += TILESIZE
-        y+=TILESIZE
-        x = 0
+                x += TILESIZE
+            y+=TILESIZE
+            x = 0
 
+
+start_level('map2.txt')
 finish = False
 while True:
 #оброби подію «клік за кнопкою "Закрити вікно"»
@@ -279,7 +295,17 @@ while True:
         sight_field.update()
     if player.hp <= 0:
         finish = True
-
+    if sprite.collide_rect(player, collision_block):
+        print('avc')
+        for s in sprites:
+            s.kill()
+        
+        start_level('map2.txt')
+    elif sprite.collide_rect(player, hole1):
+        for s in sprites:
+            s.kill()
+        start_level('map3.txt')        
+    
     if sprite.collide_rect(player, treasure):        
         finish = True
         finish_text = font2.render('U Won!', True, (255, 0, 15))
